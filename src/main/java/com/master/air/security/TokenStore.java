@@ -40,6 +40,15 @@ public class TokenStore {
         return token;
     }
 
+
+public static String generateToken(Long userId, String username) {
+    String token = UUID.randomUUID().toString();
+    Instant expiry = Instant.now().plusSeconds(TOKEN_EXPIRY_SECONDS);
+    tokens.put(token, new TokenInfo(userId, username, expiry));
+    return token;
+}
+
+
     public static Optional<TokenInfo> validateToken(String token) {
         TokenInfo info = tokens.get(token);
         if (info == null || info.isExpired()) {
@@ -48,7 +57,6 @@ public class TokenStore {
         }
         return Optional.of(info);
     }
-
 
     public static void removeToken(String token) {
         tokens.remove(token);

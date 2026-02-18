@@ -51,6 +51,11 @@ public class AnnonceRepository {
         return em.merge(annonce);
     }
 
+    // Compatibility helper used by tests/mocks: save -> update
+    public Annonce save(Annonce annonce) {
+        return update(annonce);
+    }
+
     public void delete(Annonce annonce) {
         em.remove(em.contains(annonce) ? annonce : em.merge(annonce));
     }

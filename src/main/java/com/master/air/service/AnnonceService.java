@@ -1,5 +1,8 @@
 package com.master.air.service;
 
+import com.master.air.exception.ConflictException;
+import com.master.air.exception.ForbiddenException;
+import com.master.air.exception.NotFoundException;
 import com.master.air.model.*;
 import com.master.air.repository.AnnonceRepository;
 import com.master.air.repository.CategoryRepository;
@@ -7,24 +10,19 @@ import com.master.air.repository.UserRepository;
 import com.master.air.util.JPAUtil;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
+import jakarta.persistence.OptimisticLockException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Service métier pour les annonces.
- * Les transactions JPA sont gérées ici (et non dans les Servlets).
- *
- * Exercice 4 – Couche Service & Transactions
- */
+
 public class AnnonceService {
 
     private static final Logger log = LoggerFactory.getLogger(AnnonceService.class);
     private static final int DEFAULT_PAGE_SIZE = 6;
 
-    // ==================== Création ====================
 
     public Annonce createAnnonce(String title, String description, String adress,
                                   String mail, Long authorId, Long categoryId) {
@@ -64,10 +62,9 @@ public class AnnonceService {
         }
     }
 
-    // ==================== Modification ====================
 
     public Annonce updateAnnonce(Long annonceId, String title, String description,
-                                  String adress, String mail, Long categoryId) {
+                                  String adress, String mail, Long categoryId, Long currentUserId) {
         EntityManager em = JPAUtil.getEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
@@ -76,8 +73,16 @@ public class AnnonceService {
             AnnonceRepository annonceRepo = new AnnonceRepository(em);
             CategoryRepository catRepo = new CategoryRepository(em);
 
-            Annonce annonce = annonceRepo.findById(annonceId)
-                    .orElseThrow(() -> new IllegalArgumentException("Annonce introuvable (id=" + annonceId + ")"));
+            Annonce annonce = annonceRepo.findByIdWithRelations(annonceId)
+                    .orElseThrow(() -> new NotFoundException("Annonce introuvable (id=" + annonceId + ")"));
+
+            if (!annonce.getAuthor().getId().equals(currentUserId)) {
+                throw new ForbiddenException("Seul l'auteur peut modifier cette annonce");
+            }
+
+            if (annonce.getStatus() == AnnonceStatus.PUBLISHED) {
+                throw new ConflictException("Une annonce publiee ne peut plus etre modifiee");
+            }
 
             annonce.setTitle(title);
             annonce.setDescription(description);
@@ -86,14 +91,20 @@ public class AnnonceService {
 
             if (categoryId != null) {
                 Category category = catRepo.findById(categoryId)
-                        .orElseThrow(() -> new IllegalArgumentException("Catégorie introuvable"));
+                        .orElseThrow(() -> new NotFoundException("Categorie introuvable"));
                 annonce.setCategory(category);
             }
 
             annonceRepo.update(annonce);
             tx.commit();
-            log.info("Annonce modifiée : id={}", annonceId);
+            log.info("Annonce modifiee : id={}", annonceId);
             return annonce;
+        } catch (OptimisticLockException e) {
+            if (tx.isActive()) tx.rollback();
+            throw new ConflictException("Conflit de concurrence : l'annonce a ete modifiee par un autre utilisateur");
+        } catch (NotFoundException | ForbiddenException | ConflictException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             log.error("Erreur modification annonce", e);
@@ -103,13 +114,11 @@ public class AnnonceService {
         }
     }
 
-    // ==================== Publication ====================
 
     public Annonce publishAnnonce(Long annonceId) {
         return changeStatus(annonceId, AnnonceStatus.PUBLISHED, "publication");
     }
 
-    // ==================== Archivage ====================
 
     public Annonce archiveAnnonce(Long annonceId) {
         return changeStatus(annonceId, AnnonceStatus.ARCHIVED, "archivage");
@@ -123,7 +132,7 @@ public class AnnonceService {
             AnnonceRepository repo = new AnnonceRepository(em);
 
             Annonce annonce = repo.findById(annonceId)
-                    .orElseThrow(() -> new IllegalArgumentException("Annonce introuvable"));
+                    .orElseThrow(() -> new NotFoundException("Annonce introuvable (id=" + annonceId + ")"));
 
             annonce.setStatus(newStatus);
             repo.update(annonce);
@@ -139,21 +148,31 @@ public class AnnonceService {
         }
     }
 
-    // ==================== Suppression ====================
 
-    public void deleteAnnonce(Long annonceId) {
+    public void deleteAnnonce(Long annonceId, Long currentUserId) {
         EntityManager em = JPAUtil.getEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
             tx.begin();
             AnnonceRepository repo = new AnnonceRepository(em);
 
-            Annonce annonce = repo.findById(annonceId)
-                    .orElseThrow(() -> new IllegalArgumentException("Annonce introuvable"));
+            Annonce annonce = repo.findByIdWithRelations(annonceId)
+                    .orElseThrow(() -> new NotFoundException("Annonce introuvable"));
+
+            if (!annonce.getAuthor().getId().equals(currentUserId)) {
+                throw new ForbiddenException("Seul l'auteur peut supprimer cette annonce");
+            }
+
+            if (annonce.getStatus() != AnnonceStatus.ARCHIVED) {
+                throw new ConflictException("L'annonce doit etre archivee avant d'etre supprimee (statut actuel: " + annonce.getStatus() + ")");
+            }
 
             repo.delete(annonce);
             tx.commit();
-            log.info("Annonce supprimée : id={}", annonceId);
+            log.info("Annonce supprimee : id={}", annonceId);
+        } catch (NotFoundException | ForbiddenException | ConflictException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             log.error("Erreur suppression annonce", e);
@@ -163,7 +182,6 @@ public class AnnonceService {
         }
     }
 
-    // ==================== Recherche & listing paginé ====================
 
     public PaginatedResult<Annonce> listAnnonces(int page, int pageSize) {
         EntityManager em = JPAUtil.getEntityManager();

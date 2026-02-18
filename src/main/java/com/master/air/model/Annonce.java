@@ -9,25 +9,26 @@ import jakarta.validation.constraints.Size;
 import java.sql.Timestamp;
 import java.util.Objects;
 
+
 @Entity
 @Table(name = "annonce")
 @NamedQueries({
-        @NamedQuery(
-                name = "Annonce.findByKeyword",
-                query = "SELECT a FROM Annonce a WHERE LOWER(a.title) LIKE LOWER(:keyword) OR LOWER(a.description) LIKE LOWER(:keyword) ORDER BY a.date DESC"
-        ),
-        @NamedQuery(
-                name = "Annonce.countByKeyword",
-                query = "SELECT COUNT(a) FROM Annonce a WHERE LOWER(a.title) LIKE LOWER(:keyword) OR LOWER(a.description) LIKE LOWER(:keyword)"
-        ),
-        @NamedQuery(
-                name = "Annonce.findByCategoryAndStatus",
-                query = "SELECT a FROM Annonce a WHERE (:categoryId IS NULL OR a.category.id = :categoryId) AND (:status IS NULL OR a.status = :status) ORDER BY a.date DESC"
-        ),
-        @NamedQuery(
-                name = "Annonce.countByCategoryAndStatus",
-                query = "SELECT COUNT(a) FROM Annonce a WHERE (:categoryId IS NULL OR a.category.id = :categoryId) AND (:status IS NULL OR a.status = :status)"
-        )
+    @NamedQuery(
+        name = "Annonce.findByKeyword",
+        query = "SELECT a FROM Annonce a WHERE LOWER(a.title) LIKE LOWER(:keyword) OR LOWER(a.description) LIKE LOWER(:keyword) ORDER BY a.date DESC"
+    ),
+    @NamedQuery(
+        name = "Annonce.countByKeyword",
+        query = "SELECT COUNT(a) FROM Annonce a WHERE LOWER(a.title) LIKE LOWER(:keyword) OR LOWER(a.description) LIKE LOWER(:keyword)"
+    ),
+    @NamedQuery(
+        name = "Annonce.findByCategoryAndStatus",
+        query = "SELECT a FROM Annonce a WHERE (:categoryId IS NULL OR a.category.id = :categoryId) AND (:status IS NULL OR a.status = :status) ORDER BY a.date DESC"
+    ),
+    @NamedQuery(
+        name = "Annonce.countByCategoryAndStatus",
+        query = "SELECT COUNT(a) FROM Annonce a WHERE (:categoryId IS NULL OR a.category.id = :categoryId) AND (:status IS NULL OR a.status = :status)"
+    )
 })
 public class Annonce {
 
@@ -64,6 +65,10 @@ public class Annonce {
     @Column(nullable = false, length = 20)
     private AnnonceStatus status = AnnonceStatus.DRAFT;
 
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", nullable = false)
     private User author;
@@ -84,6 +89,7 @@ public class Annonce {
             status = AnnonceStatus.DRAFT;
         }
     }
+
 
     public Long getId() {
         return id;
@@ -143,6 +149,14 @@ public class Annonce {
 
     public User getAuthor() {
         return author;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public void setAuthor(User author) {

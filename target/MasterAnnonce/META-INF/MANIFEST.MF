@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
 Created-By: IntelliJ IDEA
 Built-By: fabricec
-Build-Jdk: Oracle OpenJDK 25.0.1 - aarch64
+Build-Jdk: Microsoft OpenJDK 21.0.9 - aarch64
 

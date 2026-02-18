@@ -55,6 +55,7 @@ public class AnnonceRepository {
         em.remove(em.contains(annonce) ? annonce : em.merge(annonce));
     }
 
+
     public PaginatedResult<Annonce> searchByKeyword(String keyword, int page, int pageSize) {
         String likePattern = "%" + keyword + "%";
 

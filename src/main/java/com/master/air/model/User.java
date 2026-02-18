@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-
 @Entity
 @Table(name = "users")
 public class User {
@@ -56,6 +55,7 @@ public class User {
             createdAt = new Timestamp(System.currentTimeMillis());
         }
     }
+
 
     public Long getId() {
         return id;

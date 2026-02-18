@@ -11,17 +11,12 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Service métier pour les utilisateurs.
- * Gère l'authentification et l'inscription.
- */
+
 public class UserService {
 
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
-    /**
-     * Authentifie un utilisateur par username et password.
-     */
+
     public Optional<User> authenticate(String username, String password) {
         EntityManager em = JPAUtil.getEntityManager();
         try {
@@ -32,9 +27,7 @@ public class UserService {
         }
     }
 
-    /**
-     * Inscrit un nouvel utilisateur.
-     */
+
     public User register(String username, String email, String password) {
         EntityManager em = JPAUtil.getEntityManager();
         EntityTransaction tx = em.getTransaction();

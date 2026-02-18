@@ -11,9 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Service métier pour les catégories.
- */
+
 public class CategoryService {
 
     private static final Logger log = LoggerFactory.getLogger(CategoryService.class);
@@ -54,9 +52,7 @@ public class CategoryService {
         }
     }
 
-    /**
-     * Initialise les catégories par défaut si la table est vide.
-     */
+
     public void initDefaultCategories() {
         EntityManager em = JPAUtil.getEntityManager();
         EntityTransaction tx = em.getTransaction();

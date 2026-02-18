@@ -31,7 +31,6 @@ public class Category {
         this.label = label;
     }
 
-    // --- Getters / Setters ---
 
     public Long getId() {
         return id;

@@ -1,0 +1,111 @@
+{
+  "info": {
+    "name": "MasterAnnonce API - TP4 Spring Boot",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8080"},
+    {"key": "token", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "01 - Login admin",
+      "event": [{"listen": "test", "script": {"exec": ["var j=pm.response.json(); if(j.token) pm.collectionVariables.set('token',j.token);"]}}],
+      "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\"username\":\"admin\",\"password\":\"admin\"}"},
+        "url": "{{baseUrl}}/api/auth/login"}
+    },
+    {
+      "name": "02 - Login user",
+      "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\"username\":\"user\",\"password\":\"user\"}"},
+        "url": "{{baseUrl}}/api/auth/login"}
+    },
+    {
+      "name": "03 - GET annonces sans token (403)",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/annonces"}
+    },
+    {
+      "name": "04 - GET annonces",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces?page=0&size=10&sort=date,desc"}
+    },
+    {
+      "name": "05 - POST create annonce",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"},{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\"title\":\"Appart 3p\",\"description\":\"Bel appartement\",\"adress\":\"123 rue Paris\",\"mail\":\"c@t.com\",\"categoryId\":1}"},
+        "url": "{{baseUrl}}/api/annonces"}
+    },
+    {
+      "name": "06 - GET annonce detail",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces/1"}
+    },
+    {
+      "name": "07 - PUT update",
+      "request": {"method": "PUT", "header": [{"key": "Authorization", "value": "Bearer {{token}}"},{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\"title\":\"Modifie\",\"description\":\"Desc\",\"adress\":\"Addr\",\"mail\":\"m@t.com\",\"categoryId\":1}"},
+        "url": "{{baseUrl}}/api/annonces/1"}
+    },
+    {
+      "name": "08 - PATCH partiel",
+      "request": {"method": "PATCH", "header": [{"key": "Authorization", "value": "Bearer {{token}}"},{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\"title\":\"Patch\"}"},
+        "url": "{{baseUrl}}/api/annonces/1"}
+    },
+    {
+      "name": "09 - POST publish",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces/1/publish"}
+    },
+    {
+      "name": "10 - PUT published (409)",
+      "request": {"method": "PUT", "header": [{"key": "Authorization", "value": "Bearer {{token}}"},{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\"title\":\"X\",\"description\":\"D\",\"adress\":\"A\",\"mail\":\"m@t.com\",\"categoryId\":1}"},
+        "url": "{{baseUrl}}/api/annonces/1"}
+    },
+    {
+      "name": "11 - POST archive (admin)",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces/1/archive"}
+    },
+    {
+      "name": "12 - DELETE",
+      "request": {"method": "DELETE", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces/1"}
+    },
+    {
+      "name": "13 - GET 404",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces/9999"}
+    },
+    {
+      "name": "14 - Validation 400",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"},{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\"title\":\"\",\"description\":\"\",\"adress\":\"\",\"mail\":\"bad\",\"categoryId\":null}"},
+        "url": "{{baseUrl}}/api/annonces"}
+    },
+    {
+      "name": "15 - Search keyword",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces?q=appart"}
+    },
+    {
+      "name": "16 - Filter status",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": "{{baseUrl}}/api/annonces?status=DRAFT"}
+    },
+    {
+      "name": "17 - Meta introspection",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/meta/annonces"}
+    },
+    {
+      "name": "18 - Swagger",
+      "request": {"method": "GET", "url": "{{baseUrl}}/swagger-ui/index.html"}
+    },
+    {
+      "name": "19 - Actuator health",
+      "request": {"method": "GET", "url": "{{baseUrl}}/actuator/health"}
+    }
+  ]
+}

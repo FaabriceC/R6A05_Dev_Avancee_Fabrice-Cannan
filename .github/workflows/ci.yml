@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    name: Tests (Java ${{ matrix.java }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [17, 21]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: MasterAnnonce
+          POSTGRES_USER: myuser
+          POSTGRES_PASSWORD: mypassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U myuser -d MasterAnnonce"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/MasterAnnonce
+      SPRING_DATASOURCE_USERNAME: myuser
+      SPRING_DATASOURCE_PASSWORD: mypassword
+
+      APP_JWT_SECRET: "ci-secret-ci-secret-ci-secret-ci-secret-32chars"
+      APP_JWT_EXPIRATION_MS: "3600000"
+
+      TZ: Europe/Paris
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Build + tests
+        run: mvn -B clean verify
+
+      # ---- Artifacts ----
+      - name: Upload JAR artifact
+        if: ${{ matrix.java == 21 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: master-annonce-jar
+          path: |
+            target/*.jar
+          if-no-files-found: error
+
+      - name: Upload JaCoCo report
+        if: ${{ matrix.java == 21 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: |
+            target/site/jacoco/**
+          if-no-files-found: warn
+
+  docker:
+    name: Docker build (main only)
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker build
+        run: docker build -t master-annonce:ci .

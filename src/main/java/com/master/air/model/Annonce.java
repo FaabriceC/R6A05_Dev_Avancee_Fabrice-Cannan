@@ -1,108 +1,72 @@
 package com.master.air.model;
 
-import java.sql.Timestamp;
-import java.util.Objects;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.time.LocalDateTime;
 
-
+@Entity
+@Table(name = "annonce")
 public class Annonce {
-    
-    private Integer id;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank @Size(max = 64)
+    @Column(nullable = false, length = 64)
     private String title;
+
+    @NotBlank @Size(max = 256)
+    @Column(nullable = false, length = 256)
     private String description;
+
+    @NotBlank @Size(max = 64)
+    @Column(nullable = false, length = 64)
     private String adress;
+
+    @NotBlank @Email @Size(max = 64)
+    @Column(nullable = false, length = 64)
     private String mail;
-    private Timestamp date;
-    
-    public Annonce() {
+
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime date;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AnnonceStatus status = AnnonceStatus.DRAFT;
+
+    @Version
+    private Long version;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    private User author;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
+
+    @PrePersist void onCreate() {
+        if (date == null) date = LocalDateTime.now();
+        if (status == null) status = AnnonceStatus.DRAFT;
     }
-    
-    public Annonce(String title, String description, String adress, String mail) {
-        this.title = title;
-        this.description = description;
-        this.adress = adress;
-        this.mail = mail;
-        this.date = new Timestamp(System.currentTimeMillis());
-    }
-    
-    public Annonce(Integer id, String title, String description, String adress, String mail, Timestamp date) {
-        this.id = id;
-        this.title = title;
-        this.description = description;
-        this.adress = adress;
-        this.mail = mail;
-        this.date = date;
-    }
-    
-    public Integer getId() {
-        return id;
-    }
-    
-    public void setId(Integer id) {
-        this.id = id;
-    }
-    
-    public String getTitle() {
-        return title;
-    }
-    
-    public void setTitle(String title) {
-        this.title = title;
-    }
-    
-    public String getDescription() {
-        return description;
-    }
-    
-    public void setDescription(String description) {
-        this.description = description;
-    }
-    
-    public String getAdress() {
-        return adress;
-    }
-    
-    public void setAdress(String adress) {
-        this.adress = adress;
-    }
-    
-    public String getMail() {
-        return mail;
-    }
-    
-    public void setMail(String mail) {
-        this.mail = mail;
-    }
-    
-    public Timestamp getDate() {
-        return date;
-    }
-    
-    public void setDate(Timestamp date) {
-        this.date = date;
-    }
-    
-    @Override
-    public String toString() {
-        return "Annonce{" +
-                "id=" + id +
-                ", title='" + title + '\'' +
-                ", description='" + description + '\'' +
-                ", adress='" + adress + '\'' +
-                ", mail='" + mail + '\'' +
-                ", date=" + date +
-                '}';
-    }
-    
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Annonce annonce = (Annonce) o;
-        return Objects.equals(id, annonce.id);
-    }
-    
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
-    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getTitle() { return title; }
+    public void setTitle(String t) { this.title = t; }
+    public String getDescription() { return description; }
+    public void setDescription(String d) { this.description = d; }
+    public String getAdress() { return adress; }
+    public void setAdress(String a) { this.adress = a; }
+    public String getMail() { return mail; }
+    public void setMail(String m) { this.mail = m; }
+    public LocalDateTime getDate() { return date; }
+    public void setDate(LocalDateTime d) { this.date = d; }
+    public AnnonceStatus getStatus() { return status; }
+    public void setStatus(AnnonceStatus s) { this.status = s; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long v) { this.version = v; }
+    public User getAuthor() { return author; }
+    public void setAuthor(User a) { this.author = a; }
+    public Category getCategory() { return category; }
+    public void setCategory(Category c) { this.category = c; }
 }

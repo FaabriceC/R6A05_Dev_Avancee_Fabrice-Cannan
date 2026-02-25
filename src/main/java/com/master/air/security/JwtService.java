@@ -1,8 +1,6 @@
 package com.master.air.security;
 
-import com.master.air.model.User;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -10,48 +8,54 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.List;
 
 @Service
 public class JwtService {
 
-    private final SecretKey key;
-    private final long expirationMs;
+    @Value("${app.jwt.secret}")
+    private String secret;
 
-    public JwtService(
-            @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.expiration-ms}") long expirationMs
-    ) {
-        if (secret.length() < 32) {
-            throw new IllegalArgumentException("JWT secret must be at least 32 chars");
-        }
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.expirationMs = expirationMs;
+    @Value("${app.jwt.expiration-ms}")
+    private long expirationMs;
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public long getExpirationMs() {
-        return expirationMs;
-    }
-
-    public String generateToken(User user) {
-        Date now = new Date();
-        Date exp = new Date(now.getTime() + expirationMs);
-
+    public String generateToken(Long userId, String username, String role) {
         return Jwts.builder()
-                .subject(String.valueOf(user.getId()))
-                .claim("username", user.getUsername())
-                .claim("roles", List.of(user.getRole().name()))
-                .issuedAt(now)
-                .expiration(exp)
-                .signWith(key)
+                .subject(username)
+                .claim("userId", userId)
+                .claim("role", role)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .signWith(getSigningKey())
                 .compact();
     }
 
-    public Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+    public String getUsername(String token) {
+        return getClaims(token).getSubject();
+    }
+
+    public Long getUserId(String token) {
+        return getClaims(token).get("userId", Long.class);
+    }
+
+    public String getRole(String token) {
+        return getClaims(token).get("role", String.class);
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            getClaims(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private Claims getClaims(String token) {
+        return Jwts.parser().verifyWith(getSigningKey()).build()
+                .parseSignedClaims(token).getPayload();
     }
 }

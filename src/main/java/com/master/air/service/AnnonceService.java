@@ -1,138 +1,125 @@
 package com.master.air.service;
 
-import com.master.air.dto.AnnonceCreateRequestDTO;
-import com.master.air.dto.AnnonceDTO;
-import com.master.air.dto.AnnonceUpdateRequestDTO;
-import com.master.air.exception.NotFoundException;
+import com.master.air.dto.*;
+import com.master.air.exception.*;
 import com.master.air.mapper.AnnonceMapper;
-import com.master.air.model.Annonce;
-import com.master.air.model.AnnonceStatus;
-import com.master.air.repository.AnnonceRepository;
-import com.master.air.repository.CategoryRepository;
-import com.master.air.repository.UserRepository;
-import com.master.air.security.AuthContext;
-import com.master.air.spec.AnnonceSpecifications;
+import com.master.air.model.*;
+import com.master.air.repository.*;
+import com.master.air.specification.AnnonceSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 @Service
+@Transactional(readOnly = true)
 public class AnnonceService {
 
-    private final AnnonceRepository annonceRepository;
-    private final UserRepository userRepository;
-    private final CategoryRepository categoryRepository;
-    private final AnnonceMapper annonceMapper;
+    private final AnnonceRepository annonceRepo;
+    private final UserRepository userRepo;
+    private final CategoryRepository categoryRepo;
+    private final AnnonceMapper mapper;
 
-    public AnnonceService(
-            AnnonceRepository annonceRepository,
-            UserRepository userRepository,
-            CategoryRepository categoryRepository,
-            AnnonceMapper annonceMapper
-    ) {
-        this.annonceRepository = annonceRepository;
-        this.userRepository = userRepository;
-        this.categoryRepository = categoryRepository;
-        this.annonceMapper = annonceMapper;
+    public AnnonceService(AnnonceRepository ar, UserRepository ur, CategoryRepository cr, AnnonceMapper m) {
+        this.annonceRepo = ar; this.userRepo = ur; this.categoryRepo = cr; this.mapper = m;
     }
 
+    /** Recherche multi-criteres via Specifications (Exercice 3) */
+    public Page<AnnonceDTO> search(String keyword, AnnonceStatus status, Long categoryId,
+                                    Long authorId, LocalDateTime fromDate, LocalDateTime toDate,
+                                    Pageable pageable) {
+        Specification<Annonce> spec = Specification.where(AnnonceSpecifications.fetchRelations());
+        if (keyword != null && !keyword.isBlank()) spec = spec.and(AnnonceSpecifications.hasKeyword(keyword));
+        if (status != null) spec = spec.and(AnnonceSpecifications.hasStatus(status));
+        if (categoryId != null) spec = spec.and(AnnonceSpecifications.hasCategoryId(categoryId));
+        if (authorId != null) spec = spec.and(AnnonceSpecifications.hasAuthorId(authorId));
+        if (fromDate != null) spec = spec.and(AnnonceSpecifications.createdAfter(fromDate));
+        if (toDate != null) spec = spec.and(AnnonceSpecifications.createdBefore(toDate));
+        return annonceRepo.findAll(spec, pageable).map(mapper::toDTO);
+    }
 
-    @Transactional(readOnly = true)
     public AnnonceDTO getById(Long id) {
-        Annonce annonce = annonceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Annonce not found: " + id));
-        return annonceMapper.toDto(annonce);
+        return mapper.toDTO(annonceRepo.findByIdWithRelations(id)
+                .orElseThrow(() -> new NotFoundException("Annonce introuvable (id=" + id + ")")));
     }
-
-    @Transactional(readOnly = true)
-    public Page<AnnonceDTO> search(
-            String q,
-            AnnonceStatus status,
-            Long categoryId,
-            Long authorId,
-            Long fromDate,
-            Long toDate,
-            Pageable pageable
-    ) {
-        Timestamp fromTs = (fromDate == null) ? null : new Timestamp(fromDate);
-        Timestamp toTs = (toDate == null) ? null : new Timestamp(toDate);
-
-        Specification<Annonce> spec = Specification.where(AnnonceSpecifications.keywordLike(q))
-                .and(AnnonceSpecifications.hasStatus(status))
-                .and(AnnonceSpecifications.hasCategoryId(categoryId))
-                .and(AnnonceSpecifications.hasAuthorId(authorId))
-                .and(AnnonceSpecifications.fromDate(fromTs))
-                .and(AnnonceSpecifications.toDate(toTs));
-
-        return annonceRepository.findAll(spec, pageable).map(annonceMapper::toDto);
-    }
-
 
     @Transactional
-    public AnnonceDTO create(AnnonceCreateRequestDTO dto) {
-        var author = userRepository.findById(dto.authorId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + dto.authorId));
-
-        var category = categoryRepository.findById(dto.categoryId)
-                .orElseThrow(() -> new NotFoundException("Category not found: " + dto.categoryId));
-
-        Annonce entity = annonceMapper.toEntity(dto);
-        entity.setAuthor(author);
-        entity.setCategory(category);
-
-        Annonce saved = annonceRepository.save(entity);
-        return annonceMapper.toDto(saved);
+    public AnnonceDTO create(AnnonceCreateDTO dto, Long currentUserId) {
+        User author = userRepo.findById(currentUserId)
+                .orElseThrow(() -> new NotFoundException("Utilisateur introuvable"));
+        Category category = categoryRepo.findById(dto.categoryId())
+                .orElseThrow(() -> new NotFoundException("Categorie introuvable"));
+        Annonce a = mapper.toEntity(dto);
+        a.setAuthor(author);
+        a.setCategory(category);
+        a.setStatus(AnnonceStatus.DRAFT);
+        return mapper.toDTO(annonceRepo.save(a));
     }
 
-
     @Transactional
-    public AnnonceDTO update(Long id, AnnonceUpdateRequestDTO dto) {
-
-        Annonce entity = annonceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Annonce not found: " + id));
-
-        Long currentUserId = AuthContext.currentUserId();
-
-        boolean isAdmin = AuthContext.hasRole("ROLE_ADMIN");
-        boolean isAuthor = entity.getAuthor().getId().equals(currentUserId);
-
-        if (entity.getStatus() == AnnonceStatus.PUBLISHED) {
-            throw new IllegalArgumentException("Published annonces cannot be updated");
+    public AnnonceDTO update(Long id, AnnonceCreateDTO dto, Long currentUserId) {
+        Annonce a = annonceRepo.findByIdWithRelations(id)
+                .orElseThrow(() -> new NotFoundException("Annonce introuvable"));
+        checkAuthor(a, currentUserId);
+        checkNotPublished(a);
+        a.setTitle(dto.title()); a.setDescription(dto.description());
+        a.setAdress(dto.adress()); a.setMail(dto.mail());
+        if (dto.categoryId() != null) {
+            a.setCategory(categoryRepo.findById(dto.categoryId())
+                    .orElseThrow(() -> new NotFoundException("Categorie introuvable")));
         }
-
-        if (!isAdmin && !isAuthor) {
-            throw new IllegalArgumentException("Only author can update this annonce");
-        }
-
-        if (dto.status == AnnonceStatus.ARCHIVED && !isAdmin) {
-            throw new IllegalArgumentException("Only admin can archive an annonce");
-        }
-
-        var author = userRepository.findById(dto.authorId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + dto.authorId));
-
-        var category = categoryRepository.findById(dto.categoryId)
-                .orElseThrow(() -> new NotFoundException("Category not found: " + dto.categoryId));
-
-        annonceMapper.updateEntityFromDto(dto, entity);
-
-        entity.setAuthor(author);
-        entity.setCategory(category);
-
-        Annonce saved = annonceRepository.save(entity);
-        return annonceMapper.toDto(saved);
+        return mapper.toDTO(annonceRepo.save(a));
     }
 
+    @Transactional
+    public AnnonceDTO patch(Long id, AnnoncePatchDTO dto, Long currentUserId) {
+        Annonce a = annonceRepo.findByIdWithRelations(id)
+                .orElseThrow(() -> new NotFoundException("Annonce introuvable"));
+        checkAuthor(a, currentUserId);
+        checkNotPublished(a);
+        mapper.updateFromPatch(dto, a);
+        if (dto.categoryId() != null) {
+            a.setCategory(categoryRepo.findById(dto.categoryId())
+                    .orElseThrow(() -> new NotFoundException("Categorie introuvable")));
+        }
+        return mapper.toDTO(annonceRepo.save(a));
+    }
 
     @Transactional
-    public void delete(Long id) {
-        if (!annonceRepository.existsById(id)) {
-            throw new NotFoundException("Annonce not found: " + id);
-        }
-        annonceRepository.deleteById(id);
+    public AnnonceDTO publish(Long id) {
+        Annonce a = annonceRepo.findById(id).orElseThrow(() -> new NotFoundException("Annonce introuvable"));
+        a.setStatus(AnnonceStatus.PUBLISHED);
+        return mapper.toDTO(annonceRepo.save(a));
+    }
+
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public AnnonceDTO archive(Long id) {
+        Annonce a = annonceRepo.findById(id).orElseThrow(() -> new NotFoundException("Annonce introuvable"));
+        a.setStatus(AnnonceStatus.ARCHIVED);
+        return mapper.toDTO(annonceRepo.save(a));
+    }
+
+    @Transactional
+    public void delete(Long id, Long currentUserId) {
+        Annonce a = annonceRepo.findByIdWithRelations(id)
+                .orElseThrow(() -> new NotFoundException("Annonce introuvable"));
+        checkAuthor(a, currentUserId);
+        if (a.getStatus() != AnnonceStatus.ARCHIVED)
+            throw new ConflictException("L'annonce doit etre archivee avant suppression (statut: " + a.getStatus() + ")");
+        annonceRepo.delete(a);
+    }
+
+    private void checkAuthor(Annonce a, Long userId) {
+        if (!a.getAuthor().getId().equals(userId))
+            throw new ForbiddenException("Seul l'auteur peut modifier/supprimer cette annonce");
+    }
+    private void checkNotPublished(Annonce a) {
+        if (a.getStatus() == AnnonceStatus.PUBLISHED)
+            throw new ConflictException("Une annonce publiee ne peut plus etre modifiee");
     }
 }

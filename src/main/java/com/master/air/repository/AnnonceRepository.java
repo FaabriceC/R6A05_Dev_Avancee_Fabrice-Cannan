@@ -1,14 +1,15 @@
 package com.master.air.repository;
 
 import com.master.air.model.Annonce;
-import com.master.air.model.AnnonceStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.*;
-import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
 
+@Repository
 public interface AnnonceRepository extends JpaRepository<Annonce, Long>, JpaSpecificationExecutor<Annonce> {
 
-    @Query("select a from Annonce a where a.status = :status")
-    Page<Annonce> findByStatus(@Param("status") AnnonceStatus status, Pageable pageable);
+    @Query("SELECT a FROM Annonce a JOIN FETCH a.author JOIN FETCH a.category WHERE a.id = :id")
+    Optional<Annonce> findByIdWithRelations(Long id);
 }

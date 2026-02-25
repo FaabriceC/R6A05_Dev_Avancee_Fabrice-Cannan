@@ -1,186 +1,73 @@
 package com.master.air.service;
 
-import com.master.air.exception.ConflictException;
-import com.master.air.exception.ForbiddenException;
-import com.master.air.exception.NotFoundException;
-import com.master.air.model.Annonce;
-import com.master.air.model.AnnonceStatus;
-import com.master.air.model.Category;
-import com.master.air.model.User;
-import com.master.air.util.JPAUtil;
-import jakarta.persistence.EntityManager;
+import com.master.air.dto.AnnonceCreateDTO;
+import com.master.air.exception.*;
+import com.master.air.mapper.AnnonceMapper;
+import com.master.air.model.*;
+import com.master.air.repository.*;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class AnnonceServiceTest {
 
-    private static final String TEST_PU = "MasterAnnonceTestPU";
+    @Mock AnnonceRepository annonceRepo;
+    @Mock UserRepository userRepo;
+    @Mock CategoryRepository categoryRepo;
+    @Mock AnnonceMapper mapper;
+    @InjectMocks AnnonceService service;
 
-    private final AnnonceService service = new AnnonceService();
-
-    @BeforeAll
-    static void beforeAll() {
-        System.setProperty("masterannonce.persistenceUnit", TEST_PU);
-        JPAUtil.close();
+    private Annonce annonce(Long id, Long authorId, AnnonceStatus status) {
+        Annonce a = new Annonce(); a.setId(id); a.setStatus(status);
+        User u = new User(); u.setId(authorId); a.setAuthor(u);
+        Category c = new Category("Cat"); c.setId(1L); a.setCategory(c);
+        return a;
     }
 
-    @AfterAll
-    static void afterAll() {
-        JPAUtil.close();
-        System.clearProperty("masterannonce.persistenceUnit");
-    }
-
-
-    private User persistUser(String username) {
-        EntityManager em = JPAUtil.getEntityManager();
-        try {
-            em.getTransaction().begin();
-            User u = new User(username, username + "@test.com", "pass");
-            em.persist(u);
-            em.getTransaction().commit();
-            return u;
-        } finally {
-            if (em.getTransaction().isActive()) em.getTransaction().rollback();
-            em.close();
-        }
-    }
-
-    private Category persistCategory(String label) {
-        EntityManager em = JPAUtil.getEntityManager();
-        try {
-            em.getTransaction().begin();
-            Category c = new Category(label);
-            em.persist(c);
-            em.getTransaction().commit();
-            return c;
-        } finally {
-            if (em.getTransaction().isActive()) em.getTransaction().rollback();
-            em.close();
-        }
-    }
-
-    private Annonce persistAnnonce(User author, Category cat, AnnonceStatus status) {
-        EntityManager em = JPAUtil.getEntityManager();
-        try {
-            em.getTransaction().begin();
-
-            User managedUser = em.find(User.class, author.getId());
-            Category managedCat = em.find(Category.class, cat.getId());
-
-            Annonce a = new Annonce();
-            a.setTitle("Titre");
-            a.setDescription("Description");
-            a.setAdress("Adresse");
-            a.setMail("mail@test.com");
-            a.setStatus(status);
-            a.setAuthor(managedUser);
-            a.setCategory(managedCat);
-            em.persist(a);
-
-            em.getTransaction().commit();
-            return a;
-        } finally {
-            if (em.getTransaction().isActive()) em.getTransaction().rollback();
-            em.close();
-        }
-    }
-
-
-    @Test
-    @DisplayName("Règle métier: seul l'auteur peut modifier")
+    @Test @DisplayName("Seul l'auteur peut modifier -> ForbiddenException")
     void onlyAuthorCanUpdate() {
-        User author = persistUser("alice");
-        User other = persistUser("bob");
-        Category cat = persistCategory("Cat");
-        Annonce annonce = persistAnnonce(author, cat, AnnonceStatus.DRAFT);
-
+        when(annonceRepo.findByIdWithRelations(1L)).thenReturn(Optional.of(annonce(1L, 10L, AnnonceStatus.DRAFT)));
         assertThrows(ForbiddenException.class, () ->
-                service.updateAnnonce(
-                        annonce.getId(),
-                        "Nouveau titre",
-                        "Nouvelle description",
-                        "Nouvelle adresse",
-                        "new@test.com",
-                        cat.getId(),
-                        other.getId()
-                )
-        );
+            service.update(1L, new AnnonceCreateDTO("T","D","A","m@t.com",1L), 99L));
     }
 
-    @Test
-    @DisplayName("Règle métier: une annonce PUBLISHED ne peut pas être modifiée")
-    void publishedCannotBeUpdated() {
-        User author = persistUser("alice2");
-        Category cat = persistCategory("Cat2");
-        Annonce annonce = persistAnnonce(author, cat, AnnonceStatus.PUBLISHED);
-
+    @Test @DisplayName("PUBLISHED ne peut etre modifie -> ConflictException")
+    void publishedCannotUpdate() {
+        when(annonceRepo.findByIdWithRelations(1L)).thenReturn(Optional.of(annonce(1L, 10L, AnnonceStatus.PUBLISHED)));
         assertThrows(ConflictException.class, () ->
-                service.updateAnnonce(
-                        annonce.getId(),
-                        "Tentative titre",
-                        "Tentative desc",
-                        "Tentative addr",
-                        "try@test.com",
-                        cat.getId(),
-                        author.getId()
-                )
-        );
+            service.update(1L, new AnnonceCreateDTO("T","D","A","m@t.com",1L), 10L));
     }
 
-    @Test
-    @DisplayName("Règle métier: suppression requiert ARCHIVED")
+    @Test @DisplayName("Suppression requiert ARCHIVED -> ConflictException")
     void deleteRequiresArchived() {
-        User author = persistUser("alice3");
-        Category cat = persistCategory("Cat3");
-        Annonce annonce = persistAnnonce(author, cat, AnnonceStatus.DRAFT);
-
-        assertThrows(ConflictException.class, () ->
-                service.deleteAnnonce(annonce.getId(), author.getId())
-        );
+        when(annonceRepo.findByIdWithRelations(1L)).thenReturn(Optional.of(annonce(1L, 10L, AnnonceStatus.DRAFT)));
+        assertThrows(ConflictException.class, () -> service.delete(1L, 10L));
     }
 
-    @Test
-    @DisplayName("Workflow: publish change DRAFT -> PUBLISHED")
-    void publishWorkflow() {
-        User author = persistUser("alice4");
-        Category cat = persistCategory("Cat4");
-        Annonce annonce = persistAnnonce(author, cat, AnnonceStatus.DRAFT);
-
-        Annonce published = service.publishAnnonce(annonce.getId());
-        assertEquals(AnnonceStatus.PUBLISHED, published.getStatus());
-
-        Annonce fromDb = service.getAnnonce(annonce.getId()).orElseThrow();
-        assertEquals(AnnonceStatus.PUBLISHED, fromDb.getStatus());
+    @Test @DisplayName("Suppression par non-auteur -> ForbiddenException")
+    void deleteOnlyByAuthor() {
+        when(annonceRepo.findByIdWithRelations(1L)).thenReturn(Optional.of(annonce(1L, 10L, AnnonceStatus.ARCHIVED)));
+        assertThrows(ForbiddenException.class, () -> service.delete(1L, 99L));
     }
 
-    @Test
-    @DisplayName("Workflow: archive change PUBLISHED -> ARCHIVED")
-    void archiveWorkflow() {
-        User author = persistUser("alice5");
-        Category cat = persistCategory("Cat5");
-        Annonce annonce = persistAnnonce(author, cat, AnnonceStatus.PUBLISHED);
-
-        Annonce archived = service.archiveAnnonce(annonce.getId());
-        assertEquals(AnnonceStatus.ARCHIVED, archived.getStatus());
-    }
-
-    @Test
-    @DisplayName("NotFoundException si annonce inexistante")
+    @Test @DisplayName("Annonce introuvable -> NotFoundException")
     void notFound() {
-        User author = persistUser("alice6");
-        Category cat = persistCategory("Cat6");
+        when(annonceRepo.findByIdWithRelations(999L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.getById(999L));
+    }
 
-        assertThrows(NotFoundException.class, () ->
-                service.updateAnnonce(
-                        999999L,
-                        "Titre",
-                        "Desc",
-                        "Addr",
-                        "m@test.com",
-                        cat.getId(),
-                        author.getId()
-                )
-        );
+    @Test @DisplayName("Suppression OK si auteur + ARCHIVED")
+    void deleteOk() {
+        Annonce a = annonce(1L, 10L, AnnonceStatus.ARCHIVED);
+        when(annonceRepo.findByIdWithRelations(1L)).thenReturn(Optional.of(a));
+        assertDoesNotThrow(() -> service.delete(1L, 10L));
+        verify(annonceRepo).delete(a);
     }
 }

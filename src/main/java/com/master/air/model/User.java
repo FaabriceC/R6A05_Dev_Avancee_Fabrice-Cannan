@@ -33,6 +33,10 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role = UserRole.ROLE_USER;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Timestamp createdAt;
 
@@ -112,6 +116,9 @@ public class User {
         User user = (User) o;
         return Objects.equals(id, user.id);
     }
+
+    public UserRole getRole() { return role; }
+    public void setRole(UserRole role) { this.role = role; }
 
     @Override
     public int hashCode() {

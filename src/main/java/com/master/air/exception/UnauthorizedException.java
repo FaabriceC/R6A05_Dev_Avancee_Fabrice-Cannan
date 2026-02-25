@@ -1,7 +1,7 @@
 package com.master.air.exception;
 
-public class UnauthorizedException extends ApiException {
+public class UnauthorizedException extends RuntimeException {
     public UnauthorizedException(String message) {
-        super(401, message);
+        super(message);
     }
 }

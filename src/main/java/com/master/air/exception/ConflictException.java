@@ -1,7 +1,7 @@
 package com.master.air.exception;
 
-public class ConflictException extends ApiException {
+public class ConflictException extends RuntimeException {
     public ConflictException(String message) {
-        super(409, message);
+        super(message);
     }
 }

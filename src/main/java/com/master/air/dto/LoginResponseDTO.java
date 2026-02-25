@@ -1,22 +1,20 @@
 package com.master.air.dto;
 
 public class LoginResponseDTO {
-    private String token;
-    private Long userId;
-    private String username;
+    public String token;
+    public String tokenType = "Bearer";
 
-    public LoginResponseDTO() {}
+    public Long userId;
+    public String username;
+    public String role;
 
-    public LoginResponseDTO(String token, Long userId, String username) {
+    public long expiresInMs;
+
+    public LoginResponseDTO(String token, Long userId, String username, String role, long expiresInMs) {
         this.token = token;
         this.userId = userId;
         this.username = username;
+        this.role = role;
+        this.expiresInMs = expiresInMs;
     }
-
-    public String getToken() { return token; }
-    public void setToken(String t) { this.token = t; }
-    public Long getUserId() { return userId; }
-    public void setUserId(Long u) { this.userId = u; }
-    public String getUsername() { return username; }
-    public void setUsername(String u) { this.username = u; }
 }

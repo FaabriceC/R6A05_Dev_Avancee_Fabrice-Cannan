@@ -1,7 +1,7 @@
 package com.master.air.exception;
 
-public class NotFoundException extends ApiException {
+public class NotFoundException extends RuntimeException {
     public NotFoundException(String message) {
-        super(404, message);
+        super(message);
     }
 }
